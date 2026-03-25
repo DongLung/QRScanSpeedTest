@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>台灣乘車碼模擬器</title>
+    <script src="./vendor/qrcode.min.js"></script>
+    <style>
+      :root {
+        --bg: #07131a;
+        --panel: rgba(7, 26, 38, 0.74);
+        --panel-strong: rgba(9, 35, 48, 0.94);
+        --text: #ecfbff;
+        --muted: #8cb5c2;
+        --accent: #23d0c8;
+        --accent-2: #ffb84d;
+        --border: rgba(140, 181, 194, 0.24);
+        --shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Segoe UI", "PingFang TC", "Noto Sans TC", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(35, 208, 200, 0.18), transparent 30%),
+          radial-gradient(circle at bottom right, rgba(255, 184, 77, 0.18), transparent 28%),
+          linear-gradient(145deg, #041017 0%, #091f2b 52%, #0e1820 100%);
+      }
+
+      .shell {
+        width: min(1140px, calc(100% - 32px));
+        margin: 32px auto;
+        padding: 28px;
+        border: 1px solid var(--border);
+        border-radius: 28px;
+        background: var(--panel);
+        backdrop-filter: blur(18px);
+        box-shadow: var(--shadow);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+        gap: 28px;
+        align-items: stretch;
+      }
+
+      .hero-copy {
+        padding: 8px 0;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        background: rgba(35, 208, 200, 0.1);
+        color: var(--accent);
+        letter-spacing: 0.12em;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 18px 0 12px;
+        font-size: clamp(32px, 4vw, 56px);
+        line-height: 0.98;
+        letter-spacing: -0.04em;
+      }
+
+      .hero-copy p {
+        margin: 0;
+        max-width: 62ch;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.7;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 24px;
+      }
+
+      .stat {
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: rgba(8, 23, 33, 0.66);
+      }
+
+      .stat span {
+        display: block;
+      }
+
+      .stat-label {
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .stat-value {
+        margin-top: 8px;
+        font-size: 26px;
+        font-weight: 700;
+      }
+
+      .panel {
+        padding: 24px;
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        background: var(--panel-strong);
+      }
+
+      .qr-stage {
+        display: grid;
+        place-items: center;
+        gap: 18px;
+      }
+
+      .qr-frame {
+        width: min(100%, 360px);
+        aspect-ratio: 1;
+        display: grid;
+        place-items: center;
+        padding: 16px;
+        border-radius: 28px;
+        background:
+          linear-gradient(135deg, rgba(35, 208, 200, 0.14), rgba(255, 184, 77, 0.12)),
+          #ffffff;
+      }
+
+      #qrcode {
+        display: grid;
+        place-items: center;
+        width: 100%;
+        height: 100%;
+      }
+
+      #qrcode img,
+      #qrcode canvas {
+        max-width: 100%;
+        max-height: 100%;
+      }
+
+      .caption {
+        color: var(--muted);
+        text-align: center;
+        font-size: 14px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 24px;
+        margin-top: 24px;
+      }
+
+      .section-title {
+        margin: 0 0 16px;
+        font-size: 18px;
+      }
+
+      .controls {
+        display: grid;
+        gap: 16px;
+      }
+
+      .field {
+        display: grid;
+        gap: 8px;
+      }
+
+      label {
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      input[type="range"] {
+        width: 100%;
+        accent-color: var(--accent);
+      }
+
+      input[type="number"] {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: rgba(7, 19, 26, 0.8);
+        color: var(--text);
+        font-size: 16px;
+      }
+
+      .row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        appearance: none;
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 18px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: transform 160ms ease, opacity 160ms ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+      }
+
+      .primary {
+        background: linear-gradient(135deg, var(--accent), #7ae2dd);
+        color: #032027;
+      }
+
+      .secondary {
+        background: rgba(140, 181, 194, 0.14);
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+
+      .progress {
+        height: 14px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(140, 181, 194, 0.12);
+        border: 1px solid var(--border);
+      }
+
+      .progress-bar {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      }
+
+      .meta {
+        display: grid;
+        gap: 10px;
+        margin-top: 16px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .payload-box {
+        min-height: 320px;
+        padding: 18px;
+        border-radius: 18px;
+        border: 1px solid var(--border);
+        background: rgba(4, 16, 23, 0.9);
+        color: #c8f7ff;
+        font-family: "SFMono-Regular", "Consolas", "Monaco", monospace;
+        font-size: 13px;
+        line-height: 1.55;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .note {
+        margin-top: 16px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        background: rgba(255, 184, 77, 0.08);
+        color: #ffe3b5;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      @media (max-width: 900px) {
+        .hero,
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        .stats {
+          grid-template-columns: 1fr;
+        }
+
+        .shell {
+          margin: 16px auto;
+          padding: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow">Transit QR Simulator</div>
+          <h1>台灣乘車碼內容模擬</h1>
+          <p>
+            這個頁面會持續產生新的乘車碼模擬內容，並以中等容錯率產生 QR Code。
+            每筆資料都會自動補齊到至少 300 bytes，方便你測試掃碼速度、刷新頻率與畫面切換。
+          </p>
+          <div class="stats">
+            <div class="stat">
+              <span class="stat-label">容錯率</span>
+              <span class="stat-value">M</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">最小資料量</span>
+              <span class="stat-value">300 bytes</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">模式</span>
+              <span class="stat-value">自動輪替</span>
+            </div>
+          </div>
+        </div>
+
+        <section class="panel qr-stage">
+          <div class="qr-frame">
+            <div id="qrcode" aria-label="模擬乘車 QR Code"></div>
+          </div>
+          <div class="caption" id="statusText">準備產生第一個乘車碼</div>
+        </section>
+      </section>
+
+      <section class="grid">
+        <section class="panel">
+          <h2 class="section-title">輪替設定</h2>
+          <div class="controls">
+            <div class="field">
+              <label for="intervalRange">每次變換時間</label>
+              <input id="intervalRange" type="range" min="500" max="10000" step="100" value="2000" />
+            </div>
+            <div class="field">
+              <label for="intervalInput">間隔毫秒數</label>
+              <input id="intervalInput" type="number" min="500" max="10000" step="100" value="2000" />
+            </div>
+            <div class="row">
+              <button class="primary" id="toggleButton" type="button">暫停輪替</button>
+              <button class="secondary" id="refreshButton" type="button">立即換碼</button>
+            </div>
+            <div class="progress" aria-hidden="true">
+              <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="meta">
+              <div id="nextSwapText">下次變換: 2.0 秒後</div>
+              <div id="byteText">目前資料量: 0 bytes</div>
+              <div id="counterText">已產生: 0 組 QR Code</div>
+            </div>
+          </div>
+          <div class="note">
+            內容為測試用模擬資料，不對應真實台灣乘車碼格式或簽章，只保留「短時效、持續更新、資料量足夠」這些掃碼測試常見特性。
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2 class="section-title">目前模擬內容</h2>
+          <div class="payload-box" id="payloadBox"></div>
+        </section>
+      </section>
+    </main>
+
+    <script>
+      const MIN_BYTES = 300;
+      const ERROR_CORRECTION = QRCode.CorrectLevel.M;
+
+      const qrcodeEl = document.getElementById("qrcode");
+      const payloadBox = document.getElementById("payloadBox");
+      const intervalRange = document.getElementById("intervalRange");
+      const intervalInput = document.getElementById("intervalInput");
+      const toggleButton = document.getElementById("toggleButton");
+      const refreshButton = document.getElementById("refreshButton");
+      const progressBar = document.getElementById("progressBar");
+      const statusText = document.getElementById("statusText");
+      const nextSwapText = document.getElementById("nextSwapText");
+      const byteText = document.getElementById("byteText");
+      const counterText = document.getElementById("counterText");
+
+      const encoder = new TextEncoder();
+      const qr = new QRCode(qrcodeEl, {
+        text: "initializing",
+        width: 320,
+        height: 320,
+        correctLevel: ERROR_CORRECTION,
+      });
+
+      const state = {
+        intervalMs: 2000,
+        running: true,
+        counter: 0,
+        lastSwapAt: performance.now(),
+        timerId: null,
+      };
+
+      function byteLength(text) {
+        return encoder.encode(text).length;
+      }
+
+      function randomHex(length) {
+        const chars = "0123456789ABCDEF";
+        let value = "";
+        for (let i = 0; i < length; i += 1) {
+          value += chars[Math.floor(Math.random() * chars.length)];
+        }
+        return value;
+      }
+
+      function randomDigits(length) {
+        let value = "";
+        for (let i = 0; i < length; i += 1) {
+          value += Math.floor(Math.random() * 10);
+        }
+        return value;
+      }
+
+      function stationCode() {
+        const pool = [
+          "TPE-R10",
+          "TPE-BL12",
+          "KHH-R16",
+          "TYM-A08",
+          "TRA-1008",
+          "THSR-TAY",
+          "TMRT-G03",
+          "KRTC-O05",
+        ];
+        return pool[Math.floor(Math.random() * pool.length)];
+      }
+
+      function withMinimumBytes(baseText, minBytes) {
+        let result = `${baseText}|pad=`;
+        const filler = "ZXCVBNMASDFGHJKLQWERTYUIOP0123456789";
+        let index = 0;
+        while (byteLength(result) < minBytes) {
+          result += filler[index % filler.length];
+          index += 1;
+        }
+        return result;
+      }
+
+      function buildTransitPayload() {
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + state.intervalMs);
+        const serial = String(state.counter + 1).padStart(6, "0");
+
+        const base = [
+          "TW-BOARDING-SIM",
+          "ver=1",
+          "profile=taiwan-transit-qr-demo",
+          "issuer=web-lab",
+          "format=dynamic",
+          "ecc=M",
+          `seq=${serial}`,
+          `issued_at=${now.toISOString()}`,
+          `expires_at=${expiresAt.toISOString()}`,
+          `station=${stationCode()}`,
+          `device=WEB-${randomHex(12)}`,
+          `rider=SIM-${randomDigits(10)}`,
+          `trip=${randomHex(16)}`,
+          `fare_twd=${20 + Math.floor(Math.random() * 80)}`,
+          `nonce=${randomHex(48)}`,
+          `signature=${randomHex(96)}`,
+          "scope=entry,exit,transfer",
+          "network=taipei,taoyuan,kaohsiung,rail",
+        ].join("|");
+
+        return withMinimumBytes(base, MIN_BYTES);
+      }
+
+      function renderQr(payload) {
+        qr.clear();
+        qr.makeCode(payload);
+        const bytes = byteLength(payload);
+        payloadBox.textContent = payload;
+        byteText.textContent = `目前資料量: ${bytes} bytes`;
+        counterText.textContent = `已產生: ${state.counter} 組 QR Code`;
+        statusText.textContent = `乘車碼已更新，第 ${state.counter} 組，容錯率 M`;
+      }
+
+      function generateNextCode() {
+        state.counter += 1;
+        state.lastSwapAt = performance.now();
+        const payload = buildTransitPayload();
+        renderQr(payload);
+      }
+
+      function restartTimer() {
+        if (state.timerId !== null) {
+          clearInterval(state.timerId);
+        }
+        if (!state.running) {
+          return;
+        }
+        state.timerId = setInterval(generateNextCode, state.intervalMs);
+      }
+
+      function syncInterval(value) {
+        const normalized = Math.min(10000, Math.max(500, Number(value) || 2000));
+        state.intervalMs = normalized;
+        intervalRange.value = String(normalized);
+        intervalInput.value = String(normalized);
+        nextSwapText.textContent = `下次變換: ${(normalized / 1000).toFixed(1)} 秒後`;
+        restartTimer();
+      }
+
+      function setRunning(running) {
+        state.running = running;
+        toggleButton.textContent = running ? "暫停輪替" : "開始輪替";
+        if (!running && state.timerId !== null) {
+          clearInterval(state.timerId);
+          state.timerId = null;
+          progressBar.style.width = "0%";
+          statusText.textContent = `輪替已暫停，停在第 ${state.counter} 組乘車碼`;
+          return;
+        }
+        state.lastSwapAt = performance.now();
+        restartTimer();
+      }
+
+      function animateProgress() {
+        if (state.running) {
+          const elapsed = performance.now() - state.lastSwapAt;
+          const ratio = Math.min(elapsed / state.intervalMs, 1);
+          progressBar.style.width = `${ratio * 100}%`;
+          nextSwapText.textContent = `下次變換: ${Math.max((state.intervalMs - elapsed) / 1000, 0).toFixed(1)} 秒後`;
+        }
+        requestAnimationFrame(animateProgress);
+      }
+
+      intervalRange.addEventListener("input", (event) => {
+        syncInterval(event.target.value);
+      });
+
+      intervalInput.addEventListener("input", (event) => {
+        syncInterval(event.target.value);
+      });
+
+      toggleButton.addEventListener("click", () => {
+        setRunning(!state.running);
+      });
+
+      refreshButton.addEventListener("click", () => {
+        generateNextCode();
+        restartTimer();
+      });
+
+      generateNextCode();
+      restartTimer();
+      animateProgress();
+    </script>
+  </body>
+</html>
