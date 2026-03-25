@@ -4,16 +4,16 @@
 
 ## Features
 
-- 中等容錯率 `M`
+- 可調整容錯率 `L / M / Q / H`，預設 `L`
 - 每筆 QR 內容至少 `300 bytes`
 - 可調整每次變換 QR Code 的時間
+- 使用 `QRious` 高解析度 canvas 輸出
 - 支援手機瀏覽器操作
 - 內容為測試用模擬資料，不對應真實乘車碼格式
 
 ## Local Preview
 
 ```bash
-npm install
 npm run serve
 ```
 

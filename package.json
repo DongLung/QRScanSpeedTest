@@ -5,8 +5,5 @@
   "description": "Taiwan transit QR simulator for scan speed testing",
   "scripts": {
     "serve": "python3 -m http.server 4173"
-  },
-  "dependencies": {
-    "qrcodejs": "^1.0.0"
   }
 }
