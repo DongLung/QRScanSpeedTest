@@ -201,6 +201,16 @@
         font-size: 16px;
       }
 
+      select {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: rgba(7, 19, 26, 0.8);
+        color: var(--text);
+        font-size: 16px;
+      }
+
       .row {
         display: flex;
         gap: 12px;
@@ -304,21 +314,21 @@
           <div class="eyebrow">Transit QR Simulator</div>
           <h1>台灣乘車碼內容模擬</h1>
           <p>
-            這個頁面會持續產生新的乘車碼模擬內容，並以中等容錯率產生 QR Code。
-            每筆資料都會自動補齊到至少 300 bytes，方便你測試掃碼速度、刷新頻率與畫面切換。
+            這個頁面會持續產生新的乘車碼模擬內容，並用大多數掃碼 App 都有反應的 HTTPS URL 形式產生 QR Code。
+            你可以調整容錯率與輪替時間，同時維持每筆內容至少 300 bytes，方便測試掃碼速度與刷新頻率。
           </p>
           <div class="stats">
             <div class="stat">
               <span class="stat-label">容錯率</span>
-              <span class="stat-value">M</span>
+              <span class="stat-value" id="eccValue">L</span>
             </div>
             <div class="stat">
               <span class="stat-label">最小資料量</span>
               <span class="stat-value">300 bytes</span>
             </div>
             <div class="stat">
-              <span class="stat-label">模式</span>
-              <span class="stat-value">自動輪替</span>
+              <span class="stat-label">資料格式</span>
+              <span class="stat-value">HTTPS URL</span>
             </div>
           </div>
         </div>
@@ -340,6 +350,15 @@
               <input id="intervalRange" type="range" min="500" max="10000" step="100" value="2000" />
             </div>
             <div class="field">
+              <label for="eccSelect">QR 容錯率</label>
+              <select id="eccSelect">
+                <option value="L" selected>L 低容錯，最好掃</option>
+                <option value="M">M 中等容錯</option>
+                <option value="Q">Q 較高容錯</option>
+                <option value="H">H 高容錯</option>
+              </select>
+            </div>
+            <div class="field">
               <label for="intervalInput">間隔毫秒數</label>
               <input id="intervalInput" type="number" min="500" max="10000" step="100" value="2000" />
             </div>
@@ -357,7 +376,8 @@
             </div>
           </div>
           <div class="note">
-            內容為測試用模擬資料，不對應真實台灣乘車碼格式或簽章，只保留「短時效、持續更新、資料量足夠」這些掃碼測試常見特性。
+            內容為測試用模擬資料，不對應真實台灣乘車碼格式或簽章。為了讓大多數手機掃碼器都會有反應，內容採用標準 HTTPS URL。
+            如果你想提高掃描成功率，優先使用 `L` 或 `M` 容錯率。
           </div>
         </section>
 
@@ -370,11 +390,18 @@
 
     <script>
       const MIN_BYTES = 300;
-      const ERROR_CORRECTION = QRCode.CorrectLevel.M;
+      const QR_LEVELS = {
+        L: QRCode.CorrectLevel.L,
+        M: QRCode.CorrectLevel.M,
+        Q: QRCode.CorrectLevel.Q,
+        H: QRCode.CorrectLevel.H,
+      };
 
       const qrcodeEl = document.getElementById("qrcode");
       const payloadBox = document.getElementById("payloadBox");
       const intervalRange = document.getElementById("intervalRange");
+      const eccSelect = document.getElementById("eccSelect");
+      const eccValue = document.getElementById("eccValue");
       const intervalInput = document.getElementById("intervalInput");
       const toggleButton = document.getElementById("toggleButton");
       const refreshButton = document.getElementById("refreshButton");
@@ -385,19 +412,16 @@
       const counterText = document.getElementById("counterText");
 
       const encoder = new TextEncoder();
-      const qr = new QRCode(qrcodeEl, {
-        text: "initializing",
-        width: 320,
-        height: 320,
-        correctLevel: ERROR_CORRECTION,
-      });
 
       const state = {
         intervalMs: 2000,
+        errorCorrection: "L",
         running: true,
         counter: 0,
         lastSwapAt: performance.now(),
         timerId: null,
+        lastPayload: "",
+        qr: null,
       };
 
       function byteLength(text) {
@@ -435,8 +459,18 @@
         return pool[Math.floor(Math.random() * pool.length)];
       }
 
+      function createQr() {
+        qrcodeEl.innerHTML = "";
+        state.qr = new QRCode(qrcodeEl, {
+          text: "initializing",
+          width: 320,
+          height: 320,
+          correctLevel: QR_LEVELS[state.errorCorrection],
+        });
+      }
+
       function withMinimumBytes(baseText, minBytes) {
-        let result = `${baseText}|pad=`;
+        let result = `${baseText}&pad=`;
         const filler = "ZXCVBNMASDFGHJKLQWERTYUIOP0123456789";
         let index = 0;
         while (byteLength(result) < minBytes) {
@@ -450,39 +484,36 @@
         const now = new Date();
         const expiresAt = new Date(now.getTime() + state.intervalMs);
         const serial = String(state.counter + 1).padStart(6, "0");
-
-        const base = [
-          "TW-BOARDING-SIM",
-          "ver=1",
-          "profile=taiwan-transit-qr-demo",
-          "issuer=web-lab",
-          "format=dynamic",
-          "ecc=M",
-          `seq=${serial}`,
-          `issued_at=${now.toISOString()}`,
-          `expires_at=${expiresAt.toISOString()}`,
-          `station=${stationCode()}`,
-          `device=WEB-${randomHex(12)}`,
-          `rider=SIM-${randomDigits(10)}`,
-          `trip=${randomHex(16)}`,
-          `fare_twd=${20 + Math.floor(Math.random() * 80)}`,
-          `nonce=${randomHex(48)}`,
-          `signature=${randomHex(96)}`,
-          "scope=entry,exit,transfer",
-          "network=taipei,taoyuan,kaohsiung,rail",
-        ].join("|");
+        const params = new URLSearchParams({
+          v: "1",
+          type: "tw-transit-sim",
+          seq: serial,
+          ecc: state.errorCorrection,
+          iat: Math.floor(now.getTime() / 1000).toString(36),
+          exp: Math.floor(expiresAt.getTime() / 1000).toString(36),
+          st: stationCode(),
+          rider: `SIM${randomDigits(8)}`,
+          trip: randomHex(12),
+          fare: String(20 + Math.floor(Math.random() * 80)),
+          nonce: randomHex(24),
+          sig: randomHex(40),
+          src: "github-pages",
+          mode: "auto-rotate",
+        });
+        const base = `https://donglung.github.io/QRScanSpeedTest/pass?${params.toString()}`;
 
         return withMinimumBytes(base, MIN_BYTES);
       }
 
       function renderQr(payload) {
-        qr.clear();
-        qr.makeCode(payload);
+        state.qr.clear();
+        state.qr.makeCode(payload);
+        state.lastPayload = payload;
         const bytes = byteLength(payload);
         payloadBox.textContent = payload;
         byteText.textContent = `目前資料量: ${bytes} bytes`;
         counterText.textContent = `已產生: ${state.counter} 組 QR Code`;
-        statusText.textContent = `乘車碼已更新，第 ${state.counter} 組，容錯率 M`;
+        statusText.textContent = `乘車碼已更新，第 ${state.counter} 組，容錯率 ${state.errorCorrection}，掃碼後會辨識成網址`;
       }
 
       function generateNextCode() {
@@ -511,6 +542,17 @@
         restartTimer();
       }
 
+      function syncErrorCorrection(level) {
+        if (!QR_LEVELS[level]) {
+          return;
+        }
+        state.errorCorrection = level;
+        eccSelect.value = level;
+        eccValue.textContent = level;
+        createQr();
+        renderQr(buildTransitPayload());
+      }
+
       function setRunning(running) {
         state.running = running;
         toggleButton.textContent = running ? "暫停輪替" : "開始輪替";
@@ -518,7 +560,7 @@
           clearInterval(state.timerId);
           state.timerId = null;
           progressBar.style.width = "0%";
-          statusText.textContent = `輪替已暫停，停在第 ${state.counter} 組乘車碼`;
+          statusText.textContent = `輪替已暫停，停在第 ${state.counter} 組乘車碼，容錯率 ${state.errorCorrection}`;
           return;
         }
         state.lastSwapAt = performance.now();
@@ -539,6 +581,10 @@
         syncInterval(event.target.value);
       });
 
+      eccSelect.addEventListener("change", (event) => {
+        syncErrorCorrection(event.target.value);
+      });
+
       intervalInput.addEventListener("input", (event) => {
         syncInterval(event.target.value);
       });
@@ -552,6 +598,7 @@
         restartTimer();
       });
 
+      createQr();
       generateNextCode();
       restartTimer();
       animateProgress();
